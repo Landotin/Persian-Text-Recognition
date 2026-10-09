@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+.DS_Store
+
+# Source dataset, font inputs, manually collected handwriting, and generated artifacts
+04_final.zip
+data/
+fonts/
+additional_handwriting/
+artifacts/

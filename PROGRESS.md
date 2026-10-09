@@ -1,0 +1,97 @@
+# Project checkpoint
+
+Updated 9 October 2026. **The persistent Colab cache is built and verified (6,178 train/validation images). The seed-42 DenseNet121 prototype completed from the cache, and its bundle was verified. At the user's request, the fixed checkpoint received one post-hoc diagnostic on the frozen test split; it was not tuned or retrained from those results. Any future redesign informed by this diagnostic needs a fresh independent holdout.**
+
+## Objective and fixed choices
+
+- Show a prototype before groupmate handwriting arrives. Use the Colab notebook for data preparation/training/export and a separate local Streamlit app for uploads.
+- Keep DenseNet121 and the existing 33-label order. Available archive handwriting covers 32 classes; printed samples supply all 33. Handwritten آ remains unvalidated.
+- Keep Persian-reader review pending until a Persian reader performs it. Prototype labels are provisional; never mark review approved to pass a gate.
+- Preserve source-form and grouped-font assignments. The seed-42 checkpoint was evaluated once after it was fixed; do not use those results to tune it.
+
+## Completed
+
+- **Phase 1 — audit:** 122,494 readable images; 75,236 unique letters in 32 classes. Split by source form: 52,633 train / 11,209 validation / 11,394 test; no identical-pixel or source-group overlap. Writer identities are unknown. Archive SHA-256: `1faaff1234e743897652ab41e4bf3c3a2c2d87fdf1eda7886516f9bf031786e9`.
+- **Phase 2 — preparation:** updated `notebooks/01_data_preparation_training.ipynb` with prepare/prototype/final modes, one-pass shared preprocessing, size-matched isolated printed glyphs, frozen related-font groups, all-font previews, technical glyph checks, versioned manifests, and gates. Manual handwritten آ is optional for prototype.
+- Executed its preparation cells locally against the audited ZIP and supplied 12 font files. Run: `artifacts/phase2/prototype_prepare_20261007T153407357883Z/`. It generated 2,376 printed samples; all 33 labels appear in printed train/validation and all 32 archive labels appear in handwriting train/validation. All 12 font sheets rendered 33 visible classes with no blank glyphs; ا and آ differ in every font. The final split was not loaded for model training.
+- The 12 files are ten conservative design groups: seven train, two validation, one held out. Noto Sans Arabic/UI stay together, as do Noto Naskh Arabic/UI. Twelve independent designs remain a final-study target.
+- Versioned preparation bundle in Drive: [phase2-prototype-preparation-20261007.zip](https://drive.google.com/file/d/13JVaCeol8VONn-CwqOcPQYft0GlgD_PX/view?usp=drivesdk). Contains audit and manifests, previews, font checks, preprocessing, and run config.
+- Reader review is still pending. No handwritten آ samples were present. The prototype data gate passed; the final-study gate did not. The validation results below were the available performance evidence at that milestone; the later one-time test diagnostic is recorded separately.
+
+## Earlier Phase 3 prototype run — 8 October
+
+- The corrected Drive notebook was saved and run after Colab sign-in. The optional handwritten-`آ` cell now sorts `(AA_DIR / writer).glob('*')`; it ran and found 0 manual samples. The training gate checks that `PROTOTYPE_READY` exists and is true. Readiness passed for printed and archive-handwritten train/validation coverage; `FINAL_READY=False`.
+- The user started the seed-42 prototype with `RUN_PROTOTYPE_TRAINING=True` and `RUN_FINAL_TRAINING=False`. It completed on CPU (PyTorch 2.11.0+cpu; GPU unavailable) using DenseNet121 ImageNet initialization, two classifier-only epochs and three fine-tuning epochs. The best equal-source validation selection score was 0.8860.
+- Saved run: `artifacts/phase3/prototype_seed_42_20261008T154053850338Z/`. Checkpoint: `densenet121_seed_42_best.pth`; validation prediction/classification files, previews, JSON metrics, and a 26.6 MB `prototype_model_bundle.zip` are present in Drive. The runtime later disconnected, but these saved outputs remain available.
+- Verified prototype validation results:
+
+  | Source | Samples | Supported classes | Macro F1 | Accuracy |
+  | --- | ---: | ---: | ---: | ---: |
+  | Archive handwriting | 800 | 32 | 0.8025 | 0.8063 |
+  | Printed | 792 | 33 | 0.9695 | 0.9697 |
+
+- These are validation-only prototype diagnostics, not final-test evidence. The final-test split was not loaded (`final_test_used=false`). Handwritten `آ` still has 0 samples and is unsupported; independent Persian-reader review remains pending.
+- **Earlier 8 October bundle audit:** that run's ZIP omitted `preprocessing.json`, `preprocessing_source.py`, `run_config.json`, and `font_splits.json`. The 9 October rerun below produced a new bundle with the required metadata, source-specific validation outputs, predictions, checkpoint, and `bundle_manifest.json`; `unzip -t` passed all 16 entries. Use the new run's bundle going forward; the older run remains preserved as historical output.
+- This earlier run is retained as historical output; the 9 October rerun and current next action are recorded below.
+- The local notebook defaults remain `EXPERIMENT_MODE='prepare'`, `RUN_PROTOTYPE_TRAINING=False`, and `RUN_FINAL_TRAINING=False`.
+
+## Persistent prepared images — implemented 9 October
+
+- The user requested saving deterministic preparation so runtime/training time is not spent repeating it. The old notebook rebuilt the full audit and printed set per run, and prepared archive handwriting inside `__getitem__` on every access. That repeated work is removed from the default path.
+- `DATA_ACTION='reuse'` loads the verified preparation snapshot at `artifacts/phase3/prototype_seed_42_20261008T153636952896Z/`. It checks its manifest, preprocessing source/settings, 33-label order, frozen Phase 1 source-form manifest, and font groups without decoding archive images or regenerating fonts. `prepare_new` is explicit and still reuses the frozen audit assignments rather than changing them with the model seed.
+- A first cache build prepares only the selected prototype train/validation rows. It stores grayscale 224×224 PNGs, validation input thumbnails, original sample IDs/splits, hashes, and exact metadata under `artifacts/prepared/<cache_id>/`. PNGs are packaged in one `prepared_images.zip` for Drive; the ZIP is copied/extracted into local runtime storage for training. Later cache hits do not open original images, the raw archive, or fonts. New/edited data requires a new immutable preparation snapshot.
+- Training reads cached local PNGs. Random training augmentation, RGB tensor conversion, and ImageNet normalization remain per batch. Cached validation thumbnails preserve input/prepared previews without copying the original archive after training. Prototype caching excludes final-test images and unreviewed manual آ.
+- Added `scripts/prepared_dataset.py`, embedded the same implementation in the notebook, and added 15 passing synthetic module/notebook checks. These verify first-build/reuse behavior, a fresh runtime with original inputs removed, exact prepared pixels, incomplete/corrupt-cache handling, changed-preparation rejection, and reserved-test exclusion. No real cache build or new model training was executed during these checks.
+- Setup reruns retain a consistent run directory when configuration is unchanged; changed configuration clears stale readiness. Model export now requires all preprocessing/config/font/cache metadata rather than silently skipping missing files. This fixes future exports; it has not repaired the existing completed-run ZIP.
+- The updated Drive notebook was uploaded and read back successfully (22 cells; reuse enabled; both training toggles false). The prior notebook, including completed-run outputs, was preserved as [01_data_preparation_training_before_cache_20261009.ipynb](https://drive.google.com/file/d/1ZFtQvNWDFV30v89IYcX-9ZuqP7kMBL55/view?usp=drivesdk).
+- Added explicit `BLOCK 1`–`BLOCK 13` labels and a first-time/reuse workflow table to both local and Drive notebooks; readback verified all labels and instructions. First cache build without training: mode `prepare`, action `reuse`, both training flags false, Blocks 1–11. Later fresh-runtime training: mode `prototype`, action `reuse`, only prototype training true, Blocks 1–13. Blocks 3–10 initialize/check saved state; Block 11 builds only on a miss and reports `BUILT` or `REUSED`.
+- The first Colab Run All exposed a dtype-only mismatch in Block 3 (`source_group` was inferred as numeric in one CSV and text in the other). The 75,236 archive-member identities and assignments matched exactly after normalizing both identity columns to strings. Patched the saved notebook and added a numeric-source-group regression fixture; all three targeted prepared-cache tests passed.
+- Refreshed the patched Drive notebook and ran Run All with `EXPERIMENT_MODE='prepare'`, `DATA_ACTION='reuse'`, and both training toggles false. Blocks 3–10 passed; the prototype readiness gate is true, final-study gate false, and no manual handwritten آ samples were found. No model training or final-test loading occurred.
+- **Cache-build result:** Block 11 completed in the Colab Run All and reported `BUILT | 6178 images`. Durable cache: `artifacts/prepared/prototype_seed_42_9cf2c49364f340fff6fe27f6` under the Drive project. Blocks 12–13 explicitly deferred training and did not load the model or final-test split. The cache package is now available for reuse; subsequent runs restore prepared PNGs instead of repeating deterministic preprocessing.
+- **Phase 3 prototype rerun completed (9 October):** the user explicitly asked Codex to run/troubleshoot the notebook. The saved Block 1 was still `prepare` with prototype disabled, so it was switched to `EXPERIMENT_MODE='prototype'`, `DATA_ACTION='reuse'`, `RUN_PROTOTYPE_TRAINING=True`, `RUN_FINAL_TRAINING=False`. An initial UI edit left a stray text fragment and produced `SyntaxError: invalid decimal literal`; the full settings cell was then replaced, Block 1 ran successfully, and Run All passed the cached-data and readiness gates. Block 11 reported `REUSED | 6178 images`; Block 12 loaded PyTorch 2.11.0+cpu / Torchvision 0.26.0+cpu, GPU unavailable. Block 13 completed on CPU. Classifier epoch 1: loss 2.6371, selection 0.4915; handwriting validation (800 samples, 32 classes) macro F1 0.2926 / accuracy 0.3300, printed (792 samples, 33 classes) macro F1 0.6904 / accuracy 0.7020. Classifier epoch 2: loss 1.6797, selection 0.6420; handwriting macro F1 0.4613 / accuracy 0.4688, printed macro F1 0.8228 / accuracy 0.8333. Fine-tune epoch 1: loss 0.9046, selection 0.8398; handwriting macro F1 0.7278 / accuracy 0.7325, printed macro F1 0.9518 / accuracy 0.9533. Fine-tune epoch 2: loss 0.5490, selection 0.8673; handwriting macro F1 0.7838 / accuracy 0.7888, printed macro F1 0.9508 / accuracy 0.9520. Fine-tune epoch 3: loss 0.3980, selection 0.8880; handwriting macro F1 0.8078 / accuracy 0.8113, printed macro F1 0.9682 / accuracy 0.9684. Final prototype validation JSON records 800 handwriting examples/32 supported classes and 792 printed examples/33 classes with these final metrics; `final_test_used=false`. The 28,558,078-byte best checkpoint was updated at 07:06:29 UTC. The run folder `artifacts/phase3/prototype_seed_42_20261009T054030882857Z/` contains source-specific validation classifications, 242 KB combined predictions, two previews, required preprocessing/cache/config/font metadata, and a 27,259,762-byte `prototype_model_bundle.zip`. Its `bundle_manifest.json` is included; all 16 ZIP entries passed `unzip -t`. Handwritten آ remains unsupported pending reviewed manual samples; independent Persian-reader review is still pending. The live notebook's Block 1 still has prototype training enabled and final training disabled; a further Run All would start another model-training run, while reusing the prepared-image cache.
+- **Next action:** publish the source, README, aggregate report, and model bundle to the user's private GitHub repository. Keep raw images and per-image test predictions out of the repository. Do not start another Colab training run unless the user asks.
+
+## Phase 4 — Streamlit inference scaffold — 9 October
+
+- Added `streamlit_app.py`, `app_preprocessing.py`, `requirements-streamlit.txt`, and `README_STREAMLIT.md`. The app loads the bundle once, checks its hashes, 33-label order, DenseNet121 input/output shape, and exact preprocessing source, then supports a single-image upload and top-three predictions. It displays context notes and clearly labels the saved scores as validation-only; handwritten آ remains unvalidated.
+- Downloaded the 27,259,762-byte bundle from Drive to `artifacts/phase3/prototype_seed_42_20261009T054030882857Z/prototype_model_bundle.zip`. Its 16 ZIP entries and all 15 manifest hashes pass; its run metadata records `final_test_used=false`.
+- Confirmed the app's preprocessing function is byte-for-byte equivalent to the bundled notebook preprocessing source (after trimming the final newline), and the app source compiles. At that milestone, full app/model loading was pending because the available Python environments lacked PyTorch, TorchVision, and Streamlit.
+- The app itself uses validation metrics only. A later one-time test diagnostic is recorded below. Training loss fell while validation metrics rose over the five prototype epochs; those logs show no obvious overfitting signal during that short run, but cannot rule it out.
+
+## Streamlit smoke check — 9 October
+
+- Installed Streamlit 1.65.0, CPU-only PyTorch 2.11.0, and TorchVision 0.26.0 in an isolated `/tmp/pcr-streamlit-venv` after network access was approved. The app server started on `127.0.0.1:8501`; the browser showed the seed-42 bundle loaded successfully.
+- Ran the Streamlit app through its testing interface with a saved validation printed glyph (Noto Naskh Arabic, 24 px, expected ا). The app reported `Prediction: ا`, top score 83.35%; next outputs were ز (4.52%) and آ (3.44%). No app exceptions occurred. This was a single validation-example smoke check, not an additional performance metric and not test-split evidence.
+- The current Streamlit release warned that `use_container_width=True` is deprecated. Updated the dataframe call to `width="stretch"` and reran the app smoke check successfully with the same prediction and no app exceptions. The local page is open at `http://127.0.0.1:8501/` with the bundle loaded.
+
+## One-time held-out test diagnostic — 9 October
+
+- The user requested evaluation of the fixed seed-42 checkpoint. The T4 runtime's Drive mount failed repeatedly, so Colab's Google Drive API was used after the user approved its credential prompt. The full training manifest hash matched the run config; the 11,592 frozen test rows were 11,394 archive-handwriting and 198 printed. The raw archive SHA matched the Phase 1 pin, the exact printed PNGs were fetched from their saved source folder, and all 15 model-bundle member hashes passed before inference.
+- Inference used PyTorch 2.11.0+cu130 / Torchvision 0.26.0+cu130 on Tesla T4, batch size 64, the bundled checkpoint, and exact bundled preprocessing. No training or tuning occurred. Per-image predictions and raw test images were not added to the repository.
+
+  | Source | Split | Samples | Classes | Macro F1 | Accuracy | Test − validation |
+  | --- | --- | ---: | ---: | ---: | ---: | --- |
+  | Archive handwriting | Validation | 800 | 32 | 80.78% | 81.13% | — |
+  | Archive handwriting | Test | 11,394 | 32 | 82.24% | 82.38% | +1.47 / +1.25 pp |
+  | Printed | Validation | 792 | 33 | 96.82% | 96.84% | — |
+  | Printed | Test | 198 | 33 | 84.86% | 85.35% | −11.96 / −11.49 pp |
+
+- Interpretation: handwriting is close to validation and slightly higher, with no clear overfit signal on this source-form split; unknown writer IDs prevent an independent-writer claim. Printed performance drops by about 12 points on the single held-out Noto Kufi Arabic font-design group, a notable font-generalization gap rather than evidence of uniform overfitting. The 198 printed examples represent six per class. Handwritten آ has zero ground-truth test support; the model predicted it twice, and both predictions are errors.
+- The detailed, aggregate-only report is `reports/test_evaluation.md`. This test split is now consumed for a one-time prototype diagnostic. Do not tune this checkpoint using its results; if they inform a redesign, use a new independent holdout for future final claims. Handwritten آ remains unsupported and Persian-reader review remains pending.
+
+## Later
+
+The plan was reconciled with the one-time diagnostic: Phase 3 is complete, the prototype test split has been used once post-hoc, and future redesign informed by it needs a fresh independent holdout.
+
+Next: publish the README, source, aggregate test report, and model bundle release to the private `Landotin/Persian-Text-Recognition` repository. The local Streamlit smoke check is complete. The 17-file source snapshot is committed locally on `main`; raw data, generated artifacts, and the model ZIP are ignored. The Git push failed because no Git credentials are configured. The GitHub OAuth app details page had shown ChatGPT Codex Connector installed on the separate account `0nyx443`; that label referred to a GitHub App installation, not the user's computer or proof of access to this repository. Landotin's authorization page initially listed the connector, but after the user revoked authorized-app access the current page no longer lists it, and connector API calls request reauthentication. The target repo was still empty at last inspection; its repo listing/search returned no results and `get_repo` returned 404. No repository files were pushed. Any future push needs a user-approved route that can authenticate to Landotin (or an in-browser upload). The owner/admin of `0nyx443` controls removal of that separate installation. Phase 5 remains reader review, integrated handwriting, verified writer-disjoint data, and the fixed-method three-seed study; use a fresh holdout if the prototype test result informs redesign. Three writers with 10–20 آ samples each are a small pilot, not evidence of robust handwriting recognition.
+
+## Drive references
+
+- Project folder: https://drive.google.com/drive/folders/1WFK41k2Pq2lb5ZYftC9S7ETeW96tXYNd
+- Colab runtime path: `/content/drive/MyDrive/Persian Character Recognition`
+- Notebook: https://drive.google.com/file/d/1I9tBwtsYbcnbGsxFwLqmGKWuOcFaWPOG/view?usp=drivesdk
+- Fonts: https://drive.google.com/drive/folders/1Axw1PsGcCc2ISFyx16R4Cs4hJuiKuUpr
+- Handwriting collection: https://drive.google.com/drive/folders/147_x4dh99WyE9OSgbzZTGbnkfBxfBTu-
+- Planning file IDs: PROJECT_PLAN.md `1QSRu3b0OKvE3sAryTV99FC_sXFL1BzLF`; PROGRESS.md `1KTcNs9IRwf-awAlMJKTFf9wNAutFEQ01`; PHASE_1_REPORT.md `1rfs-5E3lg4yHo2ClYK7xW5r2EFtqQ7GB`.
+
+Start future turns from this checkpoint. The Colab prototype, one-time test diagnostic, and local Streamlit smoke check completed. Human label approval and the multi-seed final study remain pending. The remote repository `Landotin/Persian-Text-Recognition` exists and is private. Source files are committed locally but not pushed; the model release asset has not been uploaded because neither Git credentials nor connector access to that repository are configured.
